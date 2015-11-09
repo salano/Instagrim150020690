@@ -3,7 +3,6 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package uk.ac.dundee.computing.aec.instagrim.servlets;
 
 import com.datastax.driver.core.Cluster;
@@ -25,15 +24,15 @@ import uk.ac.dundee.computing.aec.instagrim.stores.LoggedIn;
  *
  * @author Administrator
  */
-@WebServlet(name = "Login", urlPatterns = {"/Login"})
-public class Login extends HttpServlet {
+@WebServlet(name = "Logout", urlPatterns = {"/Logout"})
+public class Logout extends HttpServlet {
+private Cluster cluster;
 
-    Cluster cluster=null;
 
 
     public void init(ServletConfig config) throws ServletException {
         // TODO Auto-generated method stub
-        cluster = CassandraHosts.getCluster();
+       cluster = CassandraHosts.getCluster();
     }
 
     /**
@@ -45,33 +44,19 @@ public class Login extends HttpServlet {
      * @throws IOException if an I/O error occurs
      */
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         synchronized(this){
-            String username=org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("username"));
-            String password=org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("password"));
-
-            User us=new User();
-            us.setCluster(cluster);
-            boolean isValid=us.IsValidUser(username, password);
             HttpSession session=request.getSession();
-            System.out.println("Session in servlet "+session);
-            if (isValid){
-                LoggedIn lg= new LoggedIn();
-                lg.setLogedin();
-                lg.setUsername(username);
-                //request.setAttribute("LoggedIn", lg);
-
-                session.setAttribute("LoggedIn", lg);
-                System.out.println("Session in servlet "+session);
-                RequestDispatcher rd=request.getRequestDispatcher("/index.jsp");
-                rd.forward(request,response);
-
-            }else{
-                response.sendRedirect("/Instagrim150020690/login.jsp");
-            }
+            LoggedIn lg = (LoggedIn) session.getAttribute("LoggedIn");
+            lg.setLogedout();
+            session.invalidate();
+            //kill database session
+            cluster.close();
+            response.sendRedirect("/Instagrim150020690/login.jsp");
             notify();
         }
+        
     }
 
     /**
@@ -81,7 +66,7 @@ public class Login extends HttpServlet {
      */
     @Override
     public String getServletInfo() {
-        return "Short description";
+        return "logs out a user";
     }// </editor-fold>
 
 }

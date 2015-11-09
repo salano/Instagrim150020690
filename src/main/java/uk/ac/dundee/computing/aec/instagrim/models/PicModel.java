@@ -29,7 +29,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Set;
 import javax.imageio.ImageIO;
 import static org.imgscalr.Scalr.*;
 import org.imgscalr.Scalr.Method;
@@ -50,7 +53,7 @@ public class PicModel {
         this.cluster = cluster;
     }
 
-    public void insertPic(byte[] b, String type, String name, String user) {
+    public void insertPic(byte[] b, String type, String name, String user, boolean profile) {
         try {
             Convertors convertor = new Convertors();
 
@@ -70,12 +73,21 @@ public class PicModel {
             byte[] processedb = picdecolour(picid.toString(),types[1]);
             ByteBuffer processedbuf=ByteBuffer.wrap(processedb);
             int processedlength=processedb.length;
-            Session session = cluster.connect("instagrim");
+            Session session = cluster.connect("instagrim_150020690");
 
             PreparedStatement psInsertPic = session.prepare("insert into pics ( picid, image,thumb,processed, user, interaction_time,imagelength,thumblength,processedlength,type,name) values(?,?,?,?,?,?,?,?,?,?,?)");
             PreparedStatement psInsertPicToUser = session.prepare("insert into userpiclist ( picid, user, pic_added) values(?,?,?)");
             BoundStatement bsInsertPic = new BoundStatement(psInsertPic);
             BoundStatement bsInsertPicToUser = new BoundStatement(psInsertPicToUser);
+            if(profile){
+                PreparedStatement psInsertProPic = session.prepare("insert into profilepic (picid,user) values(?,?)");
+                BoundStatement bsInsertProfilePic = new BoundStatement(psInsertProPic);
+                session.execute(bsInsertProfilePic.bind(picid, user));
+            }
+            
+            PreparedStatement psInsertLikePic = session.prepare("insert into userpiclikes (picid) values(?)");
+            BoundStatement bsInsertLikePic = new BoundStatement(psInsertLikePic);
+            session.execute(bsInsertLikePic.bind(picid));
 
             Date DateAdded = new Date();
             session.execute(bsInsertPic.bind(picid, buffer, thumbbuf,processedbuf, user, DateAdded, length,thumblength,processedlength, type, name));
@@ -134,7 +146,7 @@ public class PicModel {
    
     public java.util.LinkedList<Pic> getPicsForUser(String User) {
         java.util.LinkedList<Pic> Pics = new java.util.LinkedList<>();
-        Session session = cluster.connect("instagrim");
+        Session session = cluster.connect("instagrim_150020690");
         PreparedStatement ps = session.prepare("select picid from userpiclist where user =?");
         ResultSet rs = null;
         BoundStatement boundStatement = new BoundStatement(ps);
@@ -146,19 +158,26 @@ public class PicModel {
             return null;
         } else {
             for (Row row : rs) {
-                Pic pic = new Pic();
+                                Pic pic = new Pic();
+                CommentModel commentmodel = new CommentModel();
+                commentmodel.setCluster(cluster);
                 java.util.UUID UUID = row.getUUID("picid");
                 System.out.println("UUID" + UUID.toString());
                 pic.setUUID(UUID);
+                pic.addComments(commentmodel.getComment(UUID));
+                pic.addLikes(getPicLikes(UUID));
                 Pics.add(pic);
+
+
 
             }
         }
+        session.close();
         return Pics;
     }
 
     public Pic getPic(int image_type, java.util.UUID picid) {
-        Session session = cluster.connect("instagrim");
+        Session session = cluster.connect("instagrim_150020690");
         ByteBuffer bImage = null;
         String type = null;
         int length = 0;
@@ -212,5 +231,104 @@ public class PicModel {
         return p;
 
     }
+   public java.util.UUID getProfileUUID(String username)
+    {
+        java.util.UUID UUID = null;
+        Session session = cluster.connect("instagrim_150020690");
+        PreparedStatement ps = session.prepare("select picid from profilepic where user =?");
+        ResultSet rs = null;
+        BoundStatement boundStatement = new BoundStatement(ps);
+        rs = session.execute( // this is where the query is executed
+                boundStatement.bind( // here you are binding the 'boundStatement'
+                        username));
+        if (rs.isExhausted()) {
+            System.out.println("No Images returned");
+            return null;
+        } else {
+            for (Row row : rs) {
+                UUID = row.getUUID("picid");
+            }
+        }
+        session.close();
+        return UUID;
+    }
+    public Pic getProfilePic(String username){
+        Pic p =null;
+        if(getProfileUUID(username) !=null){
+        p = getPic(Convertors.DISPLAY_THUMB, getProfileUUID(username));
+        p.setUUID(getProfileUUID(username));
+      
+        }
+        return p;
+    }
+    public void setProfilePic(String username, java.util.UUID picid){
+        Session session = cluster.connect("instagrim_150020690");
+        PreparedStatement psInsertProPic = session.prepare("insert into profilepic (picid,user) values(?,?)");
+        BoundStatement bsInsertProfilePic = new BoundStatement(psInsertProPic);
+        session.execute(bsInsertProfilePic.bind(picid, username));
+        session.close();
+    }
+    
+    public void addPicLike(String name,java.util.UUID picid){
+        Session session = cluster.connect("instagrim_150020690");
+        Set<String> likes = new HashSet<String>();
+        likes.add(name);
+        PreparedStatement psAddLike = session.prepare("update userpiclikes set users = users + ? where picid = ?");
+        BoundStatement bsAddLike = new BoundStatement(psAddLike);
+        session.execute(bsAddLike.bind(likes,picid));
+        session.close();
+    }
+    public void removePicLike(String name, java.util.UUID picid){
+        Session session = cluster.connect("instagrim_150020690");
+        Set<String> likes = new HashSet<String>();
+        likes.add(name);
+        PreparedStatement psAddLike = session.prepare("update userpiclikes set users = users - ? where picid = ?");
+        BoundStatement bsAddLike = new BoundStatement(psAddLike);
+        session.execute(bsAddLike.bind(likes,picid));
+        session.close();
+    }
+    public java.util.LinkedList<String> getPicLikes(java.util.UUID picid){
+        java.util.LinkedList<String> Likes = new java.util.LinkedList<>();
+        Set<String> data = new HashSet<String>();
+        Session session = cluster.connect("instagrim_150020690");
+        PreparedStatement ps = session.prepare("select users from userpiclikes where picid =?");
+        ResultSet rs = null;
+        BoundStatement boundStatement = new BoundStatement(ps);
+        rs = session.execute( // this is where the query is executed
+                boundStatement.bind( // here you are binding the 'boundStatement'
+                        picid));
+        if (!rs.isExhausted()) {
+           for (Row row : rs) {
+               data= row.getSet("users",String.class );
+               Iterator it=data.iterator();
+                   while(it.hasNext())
+                   {
+                       Likes.add((String)it.next());
+                   }
+           }
+        }
+                   
+      
+        return Likes;
+    }
+    
+    public BufferedImage alteredImage(String picid){
+        try {
+        BufferedImage BI = ImageIO.read(new File("/var/tmp/instagrim/" + picid));
+        BI = resize(BI, Method.SPEED, 250, OP_ANTIALIAS, OP_BRIGHTER);
+        // Let's add a little border before we return result.
+            /*ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(BI, "png", baos);
+            baos.flush();
+            byte[] imageInByte = baos.toByteArray();
+            baos.close();
+            ByteBuffer processedbuf=ByteBuffer.wrap(imageInByte);
+            return processedbuf;*/
+        return pad(BI, 2);
+        } catch (IOException et) {
 
+        }
+        return null;
+    }
+            
 }

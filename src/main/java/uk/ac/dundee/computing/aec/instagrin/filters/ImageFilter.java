@@ -3,51 +3,54 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package uk.ac.dundee.computing.aec.instagrin.filters;
 
+import com.datastax.driver.core.Cluster;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
-import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.annotation.WebFilter;
 import javax.servlet.http.HttpServletRequest;
+import uk.ac.dundee.computing.aec.instagrim.lib.CassandraHosts;
+import uk.ac.dundee.computing.aec.instagrim.lib.Convertors;
+import uk.ac.dundee.computing.aec.instagrim.models.PicModel;
+import uk.ac.dundee.computing.aec.instagrim.stores.Pic;
+
 import javax.servlet.http.HttpSession;
-import uk.ac.dundee.computing.aec.instagrim.stores.LoggedIn;
 
 /**
  *
- * @author Administrator
+ * @author Salano
  */
-@WebFilter(filterName = "ProtectPages", urlPatterns = {"/upload.jsp",
-                                                       "/users.jsp",
-                                                       "/profiles.jsp",
-                                                       "/comments.jsp",
-                                                       "/UsersPics.jsp"}, dispatcherTypes = {DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.INCLUDE})
-public class ProtectPages implements Filter {
+@WebFilter(filterName = "ImageFilter", urlPatterns = {"/alter/","/alter/*"})
+public class ImageFilter implements Filter {
     
     private static final boolean debug = true;
+    private Cluster cluster;
 
     // The filter configuration object we are associated with.  If
     // this value is null, this filter instance is not currently
     // configured. 
     private FilterConfig filterConfig = null;
     
-    public ProtectPages() {
+    public ImageFilter() {
     }    
     
     private void doBeforeProcessing(ServletRequest request, ServletResponse response)
             throws IOException, ServletException {
         if (debug) {
-            log("ProtectPages:DoBeforeProcessing");
+            log("ImageFilter:DoBeforeProcessing");
         }
 
 	// Write code here to process the request and/or response before
@@ -75,7 +78,7 @@ public class ProtectPages implements Filter {
     private void doAfterProcessing(ServletRequest request, ServletResponse response)
             throws IOException, ServletException {
         if (debug) {
-            log("ProtectPages:DoAfterProcessing");
+            log("ImageFilter:DoAfterProcessing");
         }
 
 	// Write code here to process the request and/or response after
@@ -111,22 +114,26 @@ public class ProtectPages implements Filter {
             throws IOException, ServletException {
         
         if (debug) {
-            log("ProtectPages:doFilter()");
+            log("ImageFilter:doFilter()");
         }
         
         doBeforeProcessing(request, response);
-        System.out.println("Doing filter");
-        HttpServletRequest httpReq = (HttpServletRequest) request;
-        HttpSession session=httpReq.getSession(false);
-	LoggedIn li=(LoggedIn)session.getAttribute("LoggedIn");
-        System.out.println("Session in filter "+session);
-        if ((li == null)  || (li.getlogedin()==false)){
-               System.out.println("Foward to login");
-                RequestDispatcher rd=request.getRequestDispatcher("/login.jsp");
-		rd.forward(request,response);
-
-            
+        PicModel tm = new PicModel();
+        String args[] = Convertors.SplitRequestPath((HttpServletRequest)request);
+        tm.setCluster(cluster);
+  
+        
+        Pic p = tm.getPic(Convertors.DISPLAY_IMAGE,java.util.UUID.fromString(args[3]));
+        
+        
+        HttpServletRequest req = (HttpServletRequest) request;
+        HttpSession session=req.getSession();
+        session.setAttribute("Fpic", p);
+        /*byte[] buffer = new byte[8192];
+        for (int length = 0; (length = input.read(buffer)) > 0;) {
+            out.write(buffer, 0, length);
         }
+        out.close();*/
         Throwable problem = null;
         try {
             chain.doFilter(request, response);
@@ -180,9 +187,10 @@ public class ProtectPages implements Filter {
      */
     public void init(FilterConfig filterConfig) {        
         this.filterConfig = filterConfig;
+        cluster = CassandraHosts.getCluster();
         if (filterConfig != null) {
             if (debug) {                
-                log("ProtectPages:Initializing filter");
+                log("ImageFilter:Initializing filter");
             }
         }
     }
@@ -193,9 +201,9 @@ public class ProtectPages implements Filter {
     @Override
     public String toString() {
         if (filterConfig == null) {
-            return ("ProtectPages()");
+            return ("ImageFilter()");
         }
-        StringBuffer sb = new StringBuffer("ProtectPages(");
+        StringBuffer sb = new StringBuffer("ImageFilter(");
         sb.append(filterConfig);
         sb.append(")");
         return (sb.toString());

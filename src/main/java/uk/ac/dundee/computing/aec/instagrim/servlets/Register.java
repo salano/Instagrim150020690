@@ -16,8 +16,10 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import uk.ac.dundee.computing.aec.instagrim.lib.CassandraHosts;
 import uk.ac.dundee.computing.aec.instagrim.models.User;
+import org.apache.commons.lang3.StringEscapeUtils.*;
 
 /**
  *
@@ -45,14 +47,42 @@ public class Register extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        String username=request.getParameter("username");
-        String password=request.getParameter("password");
-        
-        User us=new User();
-        us.setCluster(cluster);
-        us.RegisterUser(username, password);
-        
-	response.sendRedirect("/Instagrim");
+        synchronized(this){
+            String firstname= org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("firstname"));
+            String lastname=org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("lastname"));
+            String username=org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("username"));
+            String password=org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("password"));
+            String cpassword=org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("cpassword"));
+            String email=org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("email")); 
+            String age=org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("age"));
+            String street =org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("street"));
+            String city =org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("city"));
+            String zip =org.apache.commons.lang3.StringEscapeUtils.escapeHtml4(request.getParameter("zip"));
+
+            User us=new User();
+            us.setCluster(cluster);
+            if(password.compareTo(cpassword) !=0 || password.isEmpty())
+            {
+
+                RequestDispatcher rd = request.getRequestDispatcher("/register.jsp");
+                HttpSession session=request.getSession();
+                session.setAttribute("msg", "Unmatched Password");
+                rd.forward(request, response);
+            
+            }else if(us.userExist(username)){
+                RequestDispatcher rd = request.getRequestDispatcher("/register.jsp");
+                HttpSession session=request.getSession();
+                session.setAttribute("msg", "User in use");
+                rd.forward(request, response);
+            
+            }else{
+                us.RegisterUser(username, password,firstname,lastname,email,age,street,city,zip);
+
+                response.sendRedirect("/Instagrim150020690/");
+            }
+            
+            notify();
+        }
         
     }
 

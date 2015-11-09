@@ -1,7 +1,6 @@
 package uk.ac.dundee.computing.aec.instagrim.lib;
 
 import com.datastax.driver.core.*;
-
 import java.util.Iterator;
 import java.util.Set;
 import java.util.ArrayList;
@@ -58,7 +57,7 @@ public final class CassandraHosts {
 
     public static Cluster getCluster() {
         System.out.println("getCluster");
-        cluster = Cluster.builder()
+        cluster = Cluster.builder().withProtocolVersion(ProtocolVersion.V3)
                 .addContactPoint(Host).build();
         getHosts(cluster);
         Keyspaces.SetUpKeySpaces(cluster);

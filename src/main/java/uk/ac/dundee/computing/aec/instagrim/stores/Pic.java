@@ -7,6 +7,7 @@ package uk.ac.dundee.computing.aec.instagrim.stores;
 
 import com.datastax.driver.core.utils.Bytes;
 import java.nio.ByteBuffer;
+import java.util.Hashtable;
 
 /**
  *
@@ -18,6 +19,8 @@ public class Pic {
     private int length;
     private String type;
     private java.util.UUID UUID=null;
+    private java.util.LinkedList<Comment> comments;
+    private java.util.LinkedList<String> likes;
     
     public void Pic() {
 
@@ -51,5 +54,19 @@ public class Pic {
         byte image[] = Bytes.getArray(bImage);
         return image;
     }
-
+    public void addComments(java.util.LinkedList<Comment> comments){
+       this.comments = comments; 
+    }
+    public java.util.LinkedList<Comment> getComments(){
+        return this.comments;
+    }
+    
+    public void addLikes(java.util.LinkedList<String> likes){
+       this.likes = likes; 
+    }
+    public java.util.LinkedList<String> getLikes(){
+        return this.likes;
+    }
+            
+    
 }
